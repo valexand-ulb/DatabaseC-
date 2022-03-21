@@ -2,7 +2,7 @@
 
 Database::Database() {
     sqlite3_open("test.db", &this->DB);
-    char* messageError;
+    char *messageError;
 
     std::string sql1 = "CREATE TABLE IF NOT EXISTS UserData ("
                        "Username TEXT NOT NULL UNIQUE,"
@@ -12,8 +12,9 @@ Database::Database() {
 
 
     std::string sql2 = "CREATE TABLE IF NOT EXISTS GameScore ("
-                       "Username TEXT,"
-                       "Score INTEGER,"
+                       "Username TEXT NOT NULL UNIQUE,"
+                       "GamesPlayed INTEGER DEFAULT 0,"
+                       "GamesWon INTEGER DEFAULT 0,"
                        "PRIMARY KEY (Username)"
                        "FOREIGN KEY (Username) REFERENCES UserData(Username))";
     sqlite3_exec(this->DB, sql2.c_str(), NULL, 0, &messageError);
@@ -29,66 +30,93 @@ Database::Database() {
 
 bool Database::createNewAccount(std::string username, std::string password) {
     std::hash<std::string> hsh;
-    if (isUserinDB(username)){
+    if (isUserinDB(username)) {
         return false;
     }
 
-    const std::string sqlRequest = "INSERT INTO UserData(username,password) VALUES ('" + username + "', '" + std::to_string(hsh(password)) + "')";
+    const std::string sqlRequest =
+            "INSERT INTO UserData(username,password) VALUES ('" + username + "', '" + std::to_string(hsh(password)) +
+            "')";
     sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
 
     return true;
 }
 
-bool Database::createFriendship(const std::string username1, const std::string username2)
-{
-    if (doesFriendshipExists(username1, username2))
-    {
+bool Database::createFriendship(std::string username1, std::string username2) {
+    if (doesFriendshipExists(username1, username2) or doesFriendshipExists(username2, username1) or
+        username1 == username2) {
         return false;
     }
-
-    const std::string sqlRequest = "INSERT INTO FriendshipEntry(Username1, Username2) VALUES ('" + username1 + "', '" + username2 + "')";
-    sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
-
+    for (int i = 0; i < 2; i++) {
+        const std::string sqlRequest =
+                "INSERT INTO FriendshipEntry(Username1, Username2) VALUES ('" + username1 + "', '" + username2 + "')";
+        sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
+        std::string temp = username1;
+        username1 = username2;
+        username2 = temp;
+    }
     return true;
 }
 
 bool Database::isUserinDB(std::string username) {
-    sqlite3_stmt* stmt;
+    sqlite3_stmt *stmt;
     const std::string sqlRequest = "SELECT username FROM UserData WHERE Username = '" + username + "'";
 
     sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
     int ret_code;
-    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW)
-    {
-        if (username == std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))))
-        {
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW) {
+        if (username == std::string(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)))) {
             return true;
         }
     }
     return false;
 }
 
-bool Database::doesFriendshipExists(const std::string username1, const std::string username2)
-{
-    sqlite3_stmt* stmt;
+bool Database::doesFriendshipExists(const std::string username1, const std::string username2) {
+    sqlite3_stmt *stmt;
 
-    const std::string sqlRequest = "SELECT * FROM FriendshipEntry WHERE (Username1 = '" + username1 + "' AND Username2 = '" + username2 + "')";
+    const std::string sqlRequest =
+            "SELECT * FROM FriendshipEntry WHERE (Username1 = '" + username1 + "' AND Username2 = '" + username2 + "')";
 
     sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
     int ret_code;
     bool found = false;
 
-    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW)
-    {
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW) {
         found = true;
     }
     return found;
 }
 
-int main(){
+bool Database::deleteFriendship(std::string username1, std::string username2) {
+
+    if (doesFriendshipExists(username1, username2)) {
+        for(int i = 0;i<2;i++) {
+            const std::string sqlRequest =
+                    "DELETE FROM FriendshipEntry WHERE (username1 = '" + username1 + "' AND username2 = '" + username2 +
+                    "')";
+            sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
+            std::string temp = username1;
+            username1 = username2;
+            username2 = temp;
+        }
+        return true;
+    }
+    return false;
+}
+
+Database::~Database() {
+    sqlite3_close(this->DB);
+}
+
+int main() {
     Database DB;
     DB.createNewAccount("Alex", "Alex");
     DB.createNewAccount("Theo", "Theo");
-    DB.createFriendship("Alex","Theo");
+    DB.createNewAccount("Mark", "123");
+    DB.createFriendship("Alex", "Theo");
+    DB.createFriendship("Mark", "Alex");
+    DB.deleteFriendship("Alex", "Theo");
     return 0;
 }
+

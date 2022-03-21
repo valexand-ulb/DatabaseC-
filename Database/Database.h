@@ -14,15 +14,15 @@ private:
 public:
     // Constructeurs
     Database();
-
+    ~Database();
     // Méthodes
 
     // Bool Méthodes
     bool createNewAccount(std::string username, std::string password);
     bool createFriendship(std::string username1, std::string username2);
     bool isUserinDB(std::string username);
-    bool doesFriendshipExists(const std::string username1, const std::string username2);
-
+    bool doesFriendshipExists(std::string username1, std::string username2);
+    bool deleteFriendship(std::string username1, std::string username2);
 
 };
 
