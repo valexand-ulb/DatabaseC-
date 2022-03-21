@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <stdio.h>
+#include <string>
+#include <functional>
 #include <sqlite3.h>
 #include <vector>
 #include <string>
@@ -12,7 +14,6 @@ private:
     sqlite3* DB;
 public:
     Database();
-    ~Database();
 };
 
 
