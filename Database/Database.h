@@ -4,7 +4,6 @@
 #include <iostream>
 #include <stdio.h>
 #include <string>
-#include <functional>
 #include <sqlite3.h>
 #include <vector>
 #include <string>
@@ -13,7 +12,18 @@ class Database {
 private:
     sqlite3* DB;
 public:
+    // Constructeurs
     Database();
+
+    // Méthodes
+
+    // Bool Méthodes
+    bool createNewAccount(std::string username, std::string password);
+    bool createFriendship(std::string username1, std::string username2);
+    bool isUserinDB(std::string username);
+    bool doesFriendshipExists(const std::string username1, const std::string username2);
+
+
 };
 
 

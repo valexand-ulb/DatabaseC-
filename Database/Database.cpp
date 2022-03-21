@@ -5,10 +5,9 @@ Database::Database() {
     char* messageError;
 
     std::string sql1 = "CREATE TABLE IF NOT EXISTS UserData ("
-                       "Id INTEGER NOT NULL UNIQUE,"
                        "Username TEXT NOT NULL UNIQUE,"
                        "Password TEXT NOT NULL,"
-                       "PRIMARY KEY( Id AUTOINCREMENT))";
+                       "PRIMARY KEY(Username))";
     sqlite3_exec(this->DB, sql1.c_str(), NULL, 0, &messageError);
 
 
@@ -28,7 +27,68 @@ Database::Database() {
     sqlite3_exec(this->DB, sql3.c_str(), NULL, 0, &messageError);
 }
 
+bool Database::createNewAccount(std::string username, std::string password) {
+    std::hash<std::string> hsh;
+    if (isUserinDB(username)){
+        return false;
+    }
+
+    const std::string sqlRequest = "INSERT INTO UserData(username,password) VALUES ('" + username + "', '" + std::to_string(hsh(password)) + "')";
+    sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
+
+    return true;
+}
+
+bool Database::createFriendship(const std::string username1, const std::string username2)
+{
+    if (doesFriendshipExists(username1, username2))
+    {
+        return false;
+    }
+
+    const std::string sqlRequest = "INSERT INTO FriendshipEntry(Username1, Username2) VALUES ('" + username1 + "', '" + username2 + "')";
+    sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
+
+    return true;
+}
+
+bool Database::isUserinDB(std::string username) {
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT username FROM UserData WHERE Username = '" + username + "'";
+
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW)
+    {
+        if (username == std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Database::doesFriendshipExists(const std::string username1, const std::string username2)
+{
+    sqlite3_stmt* stmt;
+
+    const std::string sqlRequest = "SELECT * FROM FriendshipEntry WHERE (Username1 = '" + username1 + "' AND Username2 = '" + username2 + "')";
+
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    bool found = false;
+
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW)
+    {
+        found = true;
+    }
+    return found;
+}
+
 int main(){
-    Database db;
+    Database DB;
+    DB.createNewAccount("Alex", "Alex");
+    DB.createNewAccount("Theo", "Theo");
+    DB.createFriendship("Alex","Theo");
     return 0;
 }
