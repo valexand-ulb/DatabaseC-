@@ -1,5 +1,6 @@
 #include "Database.h"
 
+//constructeurs destructeur
 Database::Database() {
     sqlite3_open("test.db", &this->DB);
     char *messageError;
@@ -20,77 +21,82 @@ Database::Database() {
     sqlite3_exec(this->DB, sql2.c_str(), NULL, 0, &messageError);
 
     std::string sql3 = "CREATE TABLE IF NOT EXISTS FriendshipEntry ("
-                       "Username1 TEXT,"
-                       "Username2 TEXT,"
-                       "PRIMARY KEY (Username1, Username2)"
-                       "FOREIGN KEY (Username1) REFERENCES UserData(Username),"
-                       "FOREIGN KEY (Username2) REFERENCES UserData(Username))";
+                       "Username TEXT,"
+                       "FriendString TEXT,"
+                       "PRIMARY KEY (Username)"
+                       "FOREIGN KEY (Username) REFERENCES UserData(Username))";
     sqlite3_exec(this->DB, sql3.c_str(), NULL, 0, &messageError);
+
+    std::string sql4 = "CREATE TABLE IF NOT EXISTS ToAddFriends("
+                       "Username TEXT,"
+                       "FriendToAddString TEXT,"
+                       "PRIMARY KEY (Username)"
+                       "FOREIGN KEY (Username) REFERENCES UserData(Username))";
+    sqlite3_exec(this->DB, sql4.c_str(), NULL, 0, &messageError);
 }
 
+Database::~Database() {
+    sqlite3_close(this->DB);
+}
+
+//getter setter
+UserScore Database::getScore(std::string username) {
+
+    UserScore score{-1,-1};
+
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT GamesPlayed, GamesWon FROM GameScore WHERE (Username = '" + username + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        score.GamesPlayed = sqlite3_column_int(stmt, 0);
+        score.GamesWon = sqlite3_column_int(stmt, 1);
+    }
+    return score;
+}
+
+std::string Database::getPassword(std::string username) {
+    std::string password;
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT Password FROM UserData WHERE (Username = '" + username + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        password =  std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+    }
+    return password;
+}
+
+// write
 bool Database::createNewAccount(std::string username, std::string password) {
     std::hash<std::string> hsh;
+    std::string NoneStr="";
     if (isUserinDB(username)) {
         return false;
     }
 
+    // insert une entrée Username et psw dans la UserData
     const std::string sqlRequest =
             "INSERT INTO UserData(username,password) VALUES ('" + username + "', '" + std::to_string(hsh(password)) +
             "')";
     sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
-
+    // insert une entrée Username dans la table Gamescore
     const std::string sqlRequest2 = "INSERT INTO GameScore(Username) VALUES('"+username+"')";
     sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, NULL);
-
-    return true;
+    // insert une entrée Username et FriendStr dans la table FriendshipEntry
+    const std::string sqlRequest3 = "INSERT INTO FriendshipEntry(Username,FriendString) VALUES('"+username+"', '"+ NoneStr +"')";
+    sqlite3_exec(this->DB, sqlRequest3.c_str(), NULL, 0, NULL);
+    // insert une entrée Username et FriendStr dans la table ToAddFriends
+    const std::string sqlRequest4 = "INSERT INTO ToAddFriends(Username,FriendToAddString) VALUES('"+username+"', '"+ NoneStr +"')";
+    sqlite3_exec(this->DB, sqlRequest4.c_str(), NULL, 0, NULL);
 }
 
 bool Database::createFriendship(std::string username1, std::string username2) {
-    if (doesFriendshipExists(username1, username2) or doesFriendshipExists(username2, username1) or
-        username1 == username2) {
-        return false;
-    }
-    for (int i = 0; i < 2; i++) {
-        const std::string sqlRequest =
-                "INSERT INTO FriendshipEntry(Username1, Username2) VALUES ('" + username1 + "', '" + username2 + "')";
-        sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
-        std::string temp = username1;
-        username1 = username2;
-        username2 = temp;
-    }
-    return true;
+    //TODO
 }
 
-bool Database::isUserinDB(std::string username) {
-    sqlite3_stmt *stmt;
-    const std::string sqlRequest = "SELECT username FROM UserData WHERE Username = '" + username + "'";
-
-    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
-    int ret_code;
-    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW) {
-        if (username == std::string(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)))) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool Database::doesFriendshipExists(const std::string username1, const std::string username2) {
-    sqlite3_stmt *stmt;
-
-    const std::string sqlRequest =
-            "SELECT * FROM FriendshipEntry WHERE (Username1 = '" + username1 + "' AND Username2 = '" + username2 + "')";
-
-    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
-    int ret_code;
-    bool found = false;
-
-    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW) {
-        found = true;
-    }
-    return found;
-}
-
+// modify
 bool Database::deleteFriendship(std::string username1, std::string username2) {
 
     if (doesFriendshipExists(username1, username2)) {
@@ -106,10 +112,6 @@ bool Database::deleteFriendship(std::string username1, std::string username2) {
         return true;
     }
     return false;
-}
-
-Database::~Database() {
-    sqlite3_close(this->DB);
 }
 
 bool Database::addGamePlayed(std::string username, bool win) {
@@ -133,22 +135,6 @@ bool Database::addGamePlayed(std::string username, bool win) {
     return true;
 }
 
-UserScore Database::getScore(std::string username) {
-
-    UserScore score{-1,-1};
-
-    sqlite3_stmt* stmt;
-    const std::string sqlRequest = "SELECT GamesPlayed, GamesWon FROM GameScore WHERE (Username = '" + username + "')";
-    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
-    int ret_code;
-
-    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
-        score.GamesPlayed = sqlite3_column_int(stmt, 0);
-        score.GamesWon = sqlite3_column_int(stmt, 1);
-    }
-    return score;
-}
-
 void Database::resetTables(){
     char* messageError;
     std::string sqlRequest1 = "DELETE FROM GameScore;";
@@ -157,37 +143,74 @@ void Database::resetTables(){
     sqlite3_exec(this->DB, sqlRequest1.c_str(), NULL, 0, &messageError);
     sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, &messageError);
     sqlite3_exec(this->DB, sqlRequest3.c_str(), NULL, 0, &messageError);
-
-
-
 }
 
-std::string Database::getPassword(std::string username) {
-    std::string password;
+// read
+bool Database::isUserinDB(std::string username) {
+    sqlite3_stmt *stmt;
+    const std::string sqlRequest = "SELECT username FROM UserData WHERE Username = '" + username + "'";
+
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW) {
+        if (username == std::string(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Database::doesFriendshipExists(const std::string username1, const std::string username2) {
+    //TODO
+    std::string FriendsString;
+    std::vector<std::string> FriendsVector;
     sqlite3_stmt* stmt;
-    const std::string sqlRequest = "SELECT Password FROM UserData WHERE (Username = '" + username + "')";
+    const std::string sqlRequest = "SELECT FriendString FROM FriendshipEntry WHERE (Username = '" + username1 + "')";
     sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
     int ret_code;
     if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
-        password =  std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+        FriendsString = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
     }
-    return password;
+    stringToVect(FriendsString,FriendsVector);
+    return isStringinVect(username2,FriendsVector);
+}
+
+bool Database::checkPassword(std::string username, std::string password) {
+    std::string hashedDBPassword = getPassword(username);
+    std::hash<std::string> h;
+    std::string hashedInputPsw = std::to_string(h(password));
+    return hashedDBPassword == hashedInputPsw;
+}
+
+void Database::stringToVect(std::string inputString, std::vector<std::string> &vectAddr) {
+    std::stringstream ss(inputString);
+    std::istream_iterator<std::string> begin(ss);
+    std::istream_iterator<std::string> end;
+    std::vector<std::string> vstrings(begin, end);
+    vectAddr =vstrings;
+}
+
+bool Database::isStringinVect(std::string inputStr, const std::vector<std::string> &vect) {
+    for (std::string s: vect){
+        if (s == inputStr) return true;
+    }
 }
 
 int main() {
     Database DB;
-    DB.resetTables();
-    DB.createNewAccount("Alex", "Alex");
-    DB.createNewAccount("Theo", "Theo");
-    DB.createNewAccount("Mark", "123");
-    DB.createFriendship("Alex", "Theo");
-    DB.createFriendship("Mark", "Alex");
-    DB.deleteFriendship("Alex", "Theo");
-    DB.addGamePlayed("Alex", true);
-    DB.addGamePlayed("Alex", false);
-    UserScore alexScore = DB.getScore("Alex");
-    std::cout<<"Parties jouées : "<< alexScore.GamesPlayed<<", Parties gagnées : "<<alexScore.GamesWon<<std::endl;
-    std::cout<<DB.getPassword("Alex");
+    //DB.resetTables();
+    //DB.createNewAccount("Alex", "Alex");
+    //DB.createNewAccount("Theo", "Theo");
+    std::cout << DB.doesFriendshipExists("Alex", "Theo");
+    //DB.createNewAccount("Mark", "123");
+    //DB.createFriendship("Alex", "Theo");
+    //DB.createFriendship("Mark", "Alex");
+    //DB.deleteFriendship("Alex", "Theo");
+    //DB.addGamePlayed("Alex", true);
+    //DB.addGamePlayed("Alex", false);
+    //UserScore alexScore = DB.getScore("Alex");
+    //std::cout<<"Parties jouées : "<< alexScore.GamesPlayed<<", Parties gagnées : "<<alexScore.GamesWon<<std::endl;
+    //std::cout<<DB.getPassword("Alex");
     return 0;
 }
 
