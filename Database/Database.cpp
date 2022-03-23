@@ -151,7 +151,6 @@ UserScore Database::getScore(std::string username) {
 
 void Database::resetTables(){
     char* messageError;
-    sqlite3_stmt* stmt;
     std::string sqlRequest1 = "DELETE FROM GameScore;";
     const std::string sqlRequest2 = "DELETE FROM FriendshipEntry;";
     const std::string sqlRequest3 = "DELETE FROM UserData;";
@@ -161,6 +160,18 @@ void Database::resetTables(){
 
 
 
+}
+
+std::string Database::getPassword(std::string username) {
+    std::string password;
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT Password FROM UserData WHERE (Username = '" + username + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        password =  std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+    }
+    return password;
 }
 
 int main() {
@@ -176,6 +187,7 @@ int main() {
     DB.addGamePlayed("Alex", false);
     UserScore alexScore = DB.getScore("Alex");
     std::cout<<"Parties jouées : "<< alexScore.GamesPlayed<<", Parties gagnées : "<<alexScore.GamesWon<<std::endl;
+    std::cout<<DB.getPassword("Alex");
     return 0;
 }
 

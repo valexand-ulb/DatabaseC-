@@ -35,8 +35,9 @@ public:
     //read
     bool isUserinDB(std::string username);
     bool doesFriendshipExists(std::string username1, std::string username2);
+    std::string getPassword(std::string username);
     UserScore getScore(std::string username);
-
+    //TODO GetFriend , CheckPassword
 };
 
 
