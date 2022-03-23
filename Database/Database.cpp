@@ -133,13 +133,39 @@ bool Database::addGamePlayed(std::string username, bool win) {
     return true;
 }
 
-bool Database::getScore(std::string username) {
+UserScore Database::getScore(std::string username) {
 
-    return false;
+    UserScore score{-1,-1};
+
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT GamesPlayed, GamesWon FROM GameScore WHERE (Username = '" + username + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        score.GamesPlayed = sqlite3_column_int(stmt, 0);
+        score.GamesWon = sqlite3_column_int(stmt, 1);
+    }
+    return score;
+}
+
+void Database::resetTables(){
+    char* messageError;
+    sqlite3_stmt* stmt;
+    std::string sqlRequest1 = "DELETE FROM GameScore;";
+    const std::string sqlRequest2 = "DELETE FROM FriendshipEntry;";
+    const std::string sqlRequest3 = "DELETE FROM UserData;";
+    sqlite3_exec(this->DB, sqlRequest1.c_str(), NULL, 0, &messageError);
+    sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, &messageError);
+    sqlite3_exec(this->DB, sqlRequest3.c_str(), NULL, 0, &messageError);
+
+
+
 }
 
 int main() {
     Database DB;
+    DB.resetTables();
     DB.createNewAccount("Alex", "Alex");
     DB.createNewAccount("Theo", "Theo");
     DB.createNewAccount("Mark", "123");
@@ -148,6 +174,8 @@ int main() {
     DB.deleteFriendship("Alex", "Theo");
     DB.addGamePlayed("Alex", true);
     DB.addGamePlayed("Alex", false);
+    UserScore alexScore = DB.getScore("Alex");
+    std::cout<<"Parties jouées : "<< alexScore.GamesPlayed<<", Parties gagnées : "<<alexScore.GamesWon<<std::endl;
     return 0;
 }
 

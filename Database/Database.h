@@ -8,6 +8,11 @@
 #include <vector>
 #include <string>
 
+struct UserScore{
+    int GamesPlayed;
+    int GamesWon;
+};
+
 class Database {
 private:
     sqlite3* DB;
@@ -25,11 +30,12 @@ public:
     //modify
     bool deleteFriendship(std::string username1, std::string username2);
     bool addGamePlayed(std::string username, bool win);
+    void resetTables();
 
     //read
     bool isUserinDB(std::string username);
     bool doesFriendshipExists(std::string username1, std::string username2);
-    bool getScore(std::string username);
+    UserScore getScore(std::string username);
 
 };
 
