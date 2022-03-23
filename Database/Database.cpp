@@ -39,6 +39,9 @@ bool Database::createNewAccount(std::string username, std::string password) {
             "')";
     sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
 
+    const std::string sqlRequest2 = "INSERT INTO GameScore(Username) VALUES('"+username+"')";
+    sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, NULL);
+
     return true;
 }
 
@@ -109,6 +112,32 @@ Database::~Database() {
     sqlite3_close(this->DB);
 }
 
+bool Database::addGamePlayed(std::string username, bool win) {
+    if(!isUserinDB(username))
+        return false;
+    sqlite3_stmt* stmt;
+
+    const std::string sqlRequest = "SELECT GamesPlayed, GamesWon FROM GameScore WHERE (Username = '" + username + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        int GamesPlayed = sqlite3_column_int(stmt, 0);
+        int GamesWon = sqlite3_column_int(stmt, 1);
+        GamesPlayed++;
+        if(win)
+            GamesWon++;
+        const std::string sqlRequest2 = "UPDATE GameScore SET GamesPlayed = '" + std::to_string(GamesPlayed) + "', GamesWon = '" + std::to_string(GamesWon) + "' WHERE Username = '" + username + "'";
+        sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, NULL);
+    }
+    return true;
+}
+
+bool Database::getScore(std::string username) {
+
+    return false;
+}
+
 int main() {
     Database DB;
     DB.createNewAccount("Alex", "Alex");
@@ -117,6 +146,8 @@ int main() {
     DB.createFriendship("Alex", "Theo");
     DB.createFriendship("Mark", "Alex");
     DB.deleteFriendship("Alex", "Theo");
+    DB.addGamePlayed("Alex", true);
+    DB.addGamePlayed("Alex", false);
     return 0;
 }
 

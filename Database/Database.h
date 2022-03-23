@@ -18,11 +18,18 @@ public:
     // Méthodes
 
     // Bool Méthodes
+    //write
     bool createNewAccount(std::string username, std::string password);
     bool createFriendship(std::string username1, std::string username2);
+
+    //modify
+    bool deleteFriendship(std::string username1, std::string username2);
+    bool addGamePlayed(std::string username, bool win);
+
+    //read
     bool isUserinDB(std::string username);
     bool doesFriendshipExists(std::string username1, std::string username2);
-    bool deleteFriendship(std::string username1, std::string username2);
+    bool getScore(std::string username);
 
 };
 
