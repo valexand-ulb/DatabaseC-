@@ -72,9 +72,7 @@ std::string Database::getPassword(std::string username) {
 bool Database::createNewAccount(std::string username, std::string password) {
     std::hash<std::string> hsh;
     std::string NoneStr="";
-    if (isUserinDB(username)) {
-        return false;
-    }
+    if (isUserinDB(username)) return false;
 
     // insert une entrée Username et psw dans la UserData
     const std::string sqlRequest =
@@ -90,10 +88,25 @@ bool Database::createNewAccount(std::string username, std::string password) {
     // insert une entrée Username et FriendStr dans la table ToAddFriends
     const std::string sqlRequest4 = "INSERT INTO ToAddFriends(Username,FriendToAddString) VALUES('"+username+"', '"+ NoneStr +"')";
     sqlite3_exec(this->DB, sqlRequest4.c_str(), NULL, 0, NULL);
+    return true;
 }
 
-bool Database::createFriendship(std::string username1, std::string username2) {
-    //TODO
+bool Database::askFriend(std::string username1, std::string username2){
+    // ! user2 demande user 1 en ami
+    if (doesFriendshipExists(username1,username2) or username1==username2) return false;
+
+    std::string FriendsString;
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT FriendToAddString FROM ToAddFriends WHERE (Username = '" + username1 + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        FriendsString = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+    }
+    FriendsString += " "+username2;
+    const std::string sqlRequest2 = "UPDATE ToAddFriends SET FriendToAddString = '" + FriendsString + "' WHERE Username = '" + username1 + "'";
+    sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, NULL);
+    return true;
 }
 
 // modify
@@ -140,11 +153,26 @@ void Database::resetTables(){
     std::string sqlRequest1 = "DELETE FROM GameScore;";
     const std::string sqlRequest2 = "DELETE FROM FriendshipEntry;";
     const std::string sqlRequest3 = "DELETE FROM UserData;";
+    const std::string sqlRequest4 = "DELETE FROM ToAddFriends;";
     sqlite3_exec(this->DB, sqlRequest1.c_str(), NULL, 0, &messageError);
     sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, &messageError);
     sqlite3_exec(this->DB, sqlRequest3.c_str(), NULL, 0, &messageError);
+    sqlite3_exec(this->DB, sqlRequest4.c_str(), NULL, 0, &messageError);
 }
 
+void Database::acceptFriend(std::string username) {
+    /*
+    std::string FriendsToAddString;
+    sqlite3_stmt* stmt;
+    const std::string sqlRequest = "SELECT FriendToAddString FROM ToAddFriends WHERE (Username = '" + username + "')";
+    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
+    int ret_code;
+    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
+        FriendsToAddString = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+    }
+     */
+    //TODO
+}
 // read
 bool Database::isUserinDB(std::string username) {
     sqlite3_stmt *stmt;
@@ -163,7 +191,6 @@ bool Database::isUserinDB(std::string username) {
 bool Database::doesFriendshipExists(const std::string username1, const std::string username2) {
     //TODO
     std::string FriendsString;
-    std::vector<std::string> FriendsVector;
     sqlite3_stmt* stmt;
     const std::string sqlRequest = "SELECT FriendString FROM FriendshipEntry WHERE (Username = '" + username1 + "')";
     sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
@@ -171,8 +198,8 @@ bool Database::doesFriendshipExists(const std::string username1, const std::stri
     if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
         FriendsString = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
     }
-    stringToVect(FriendsString,FriendsVector);
-    return isStringinVect(username2,FriendsVector);
+    stringToVect(FriendsString, user1Friend.FriendsList);
+    return isStringinVect(username2,user1Friend.FriendsList);
 }
 
 bool Database::checkPassword(std::string username, std::string password) {
@@ -194,18 +221,19 @@ bool Database::isStringinVect(std::string inputStr, const std::vector<std::strin
     for (std::string s: vect){
         if (s == inputStr) return true;
     }
+    return false;
 }
 
 int main() {
     Database DB;
-    //DB.resetTables();
-    //DB.createNewAccount("Alex", "Alex");
-    //DB.createNewAccount("Theo", "Theo");
-    std::cout << DB.doesFriendshipExists("Alex", "Theo");
-    //DB.createNewAccount("Mark", "123");
-    //DB.createFriendship("Alex", "Theo");
-    //DB.createFriendship("Mark", "Alex");
-    //DB.deleteFriendship("Alex", "Theo");
+    DB.resetTables();
+    DB.createNewAccount("Alex", "Alex");
+    DB.createNewAccount("Theo", "Theo");
+    DB.createNewAccount("Mark", "123");
+    DB.askFriend("Alex","Theo");
+    DB.askFriend("Alex","Mark");
+    DB.askFriend("Mark","Theo");
+    DB.askFriend("Mark","Alex");
     //DB.addGamePlayed("Alex", true);
     //DB.addGamePlayed("Alex", false);
     //UserScore alexScore = DB.getScore("Alex");

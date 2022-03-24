@@ -21,10 +21,12 @@ struct LevelInfo {
 	int likes;
 };
 
+
 class Database
 {
 	private:
 	sqlite3* DB;
+
 
 	public:
 	//init
