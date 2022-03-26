@@ -39,8 +39,18 @@ Database::~Database() {
     sqlite3_close(this->DB);
 }
 
+//initialise
+bool Database::connect(const std::string& username) {
+    if (!isUserinDB(username))return false;
+    setUserFriendsList(username);
+    setUserFriendsToAddList(username);
+    userInfo.username = username;
+    userInfo.score = getScore(username);
+    return true;
+}
+
 //getter setter
-void Database::setUserFriendsList(std::string username) {
+void Database::setUserFriendsList(const std::string& username) {
     // récupere
     std::string FriendsString;
     sqlite3_stmt* stmt;
@@ -52,7 +62,8 @@ void Database::setUserFriendsList(std::string username) {
     }
     stringToVect(FriendsString,userInfo.FriendsList);
 }
-void Database::setUserFriendsToAddList(std::string username) {
+
+void Database::setUserFriendsToAddList(const std::string& username) {
     // récupere
     std::string FriendsToAddString;
     sqlite3_stmt* stmt;
@@ -70,7 +81,7 @@ void Database::setUserFriendsToAddList(std::string username) {
  * @param username : string du nom utilisateur
  * @return struct Userscore permettant d'avoir les partie totale perdue et gagnée
  */
-UserScore Database::getScore(std::string username) {
+UserScore Database::getScore(const std::string& username) {
 
     UserScore score{-1,-1};
 
@@ -91,7 +102,7 @@ UserScore Database::getScore(std::string username) {
  * @param username : string du nom utilisateur
  * @return hash du mot de passe
  */
-std::string Database::getPassword(std::string username) {
+std::string Database::getPassword(const std::string& username) {
     std::string password;
     sqlite3_stmt* stmt;
     const std::string sqlRequest = "SELECT Password FROM UserData WHERE (Username = '" + username + "')";
@@ -103,6 +114,18 @@ std::string Database::getPassword(std::string username) {
     return password;
 }
 
+void Database::writeFriendsList() {
+    std::string friendString = VectTostring(userInfo.FriendsList);
+    const std::string sqlRequest = "UPDATE FriendshipEntry SET FriendString = '" + friendString +"' WHERE Username = '" + userInfo.username + "'";
+    sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
+}
+
+void Database::writeFriendsToAddList() {
+    std::string friendsToAddString = VectTostring(userInfo.FriendsToAddList);
+    const std::string sqlRequest = "UPDATE ToAddFriends SET FriendToAddString = '" + friendsToAddString +"' WHERE Username = '" + userInfo.username + "'";
+    sqlite3_exec(this->DB, sqlRequest.c_str(), NULL, 0, NULL);
+}
+
 // write
 /**
  * Crée un compte dans la Base de donnée
@@ -110,7 +133,7 @@ std::string Database::getPassword(std::string username) {
  * @param password : string du mot de passe
  * @return
  */
-bool Database::createNewAccount(std::string username, std::string password) {
+bool Database::createNewAccount(const std::string& username, const std::string& password) {
     std::hash<std::string> hsh;
     std::string NoneStr="";
     if (isUserinDB(username)) return false;
@@ -138,32 +161,29 @@ bool Database::createNewAccount(std::string username, std::string password) {
  * @param username2 : string du nom utilisateur
  * @return true si opération effectuée, false sinon
  */
-bool Database::askFriend(std::string username1, std::string username2){
+bool Database::askFriend(const std::string& username){
     // ! user2 demande user 1 en ami
-    if (doesFriendshipExists(username1,username2) or username1==username2) return false;
-    std::string FriendsString;
-    sqlite3_stmt* stmt;
-    const std::string sqlRequest = "SELECT FriendToAddString FROM ToAddFriends WHERE (Username = '" + username1 + "')";
-    sqlite3_prepare_v2(this->DB, sqlRequest.c_str(), -1, &stmt, NULL);
-    int ret_code;
-    if ((ret_code = sqlite3_step(stmt)) == SQLITE_ROW){
-        FriendsString = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
-    }
-    FriendsString += " "+username2;
-    const std::string sqlRequest2 = "UPDATE ToAddFriends SET FriendToAddString = '" + FriendsString + "' WHERE Username = '" + username1 + "'";
-    sqlite3_exec(this->DB, sqlRequest2.c_str(), NULL, 0, NULL);
+    if (doesFriendshipExists(username) or userInfo.username==username) return false;
+    userInfo.FriendsToAddList.push_back(username);
+    writeFriendsToAddList();
     return true;
 }
 
-bool Database::transferFriend(std::string username, std::string validationString) {
+bool Database::transferFriend(const std::string& username) {
+    if (!isStringinVect(username,userInfo.FriendsToAddList)) return false;
+    userInfo.FriendsList.push_back(username);
+    std::remove(userInfo.FriendsToAddList.begin(),userInfo.FriendsToAddList.end(),username);
+    writeFriendsList();
+    writeFriendsToAddList();
     return true;
 }
 
 
 // modify
-bool Database::deleteFriendship(std::string username1, std::string username2) {
-    //TODO
-    return false;
+void Database::deleteFriendship(const std::string& username) {
+    std::remove(userInfo.FriendsList.begin(),userInfo.FriendsList.end(),username);
+    writeFriendsList();
+    writeFriendsToAddList();
 }
 /**
  * @brief met a jour le score de l'utilisateur
@@ -171,7 +191,7 @@ bool Database::deleteFriendship(std::string username1, std::string username2) {
  * @param win : booléen si la partie a ete gagnée
  * @return
  */
-bool Database::addGamePlayed(std::string username, bool win) {
+bool Database::addGamePlayed(const std::string& username, bool win) {
     if(!isUserinDB(username))
         return false;
     sqlite3_stmt* stmt;
@@ -206,7 +226,7 @@ void Database::resetTables(){
     sqlite3_exec(this->DB, sqlRequest4.c_str(), NULL, 0, &messageError);
 }
 // read
-bool Database::isUserinDB(std::string username) {
+bool Database::isUserinDB(const std::string& username) {
     sqlite3_stmt *stmt;
     const std::string sqlRequest = "SELECT username FROM UserData WHERE Username = '" + username + "'";
 
@@ -220,19 +240,18 @@ bool Database::isUserinDB(std::string username) {
     return false;
 }
 
-bool Database::doesFriendshipExists(const std::string username1, const std::string username2) {
-    setUserFriendsList(username1);
-    return isStringinVect(username2,userInfo.FriendsList);
+bool Database::doesFriendshipExists(const std::string& username) {
+    return isStringinVect(username,userInfo.FriendsList);
 }
 
-bool Database::checkPassword(std::string username, std::string password) {
+bool Database::checkPassword(const std::string& username, const std::string& password) {
     std::string hashedDBPassword = getPassword(username);
     std::hash<std::string> h;
     std::string hashedInputPsw = std::to_string(h(password));
     return hashedDBPassword == hashedInputPsw;
 }
 
-void Database::stringToVect(std::string inputString, std::vector<std::string> &vectAddr) {
+void Database::stringToVect(const std::string& inputString, std::vector<std::string> &vectAddr) {
     std::stringstream ss(inputString);
     std::istream_iterator<std::string> begin(ss);
     std::istream_iterator<std::string> end;
@@ -240,7 +259,15 @@ void Database::stringToVect(std::string inputString, std::vector<std::string> &v
     vectAddr =vstrings;
 }
 
-bool Database::isStringinVect(std::string inputStr, const std::vector<std::string> &vect) {
+std::string Database::VectTostring(std::vector<std::string> &vect) {
+    std::string final;
+    for (auto &s:vect){
+        final += s +" ";
+    }
+    return final;
+}
+
+bool Database::isStringinVect(const std::string& inputStr, std::vector<std::string> &vect) {
     for (std::string s: vect){
         if (s == inputStr) return true;
     }
@@ -248,13 +275,29 @@ bool Database::isStringinVect(std::string inputStr, const std::vector<std::strin
 }
 
 int main() {
+    // création de la DB
     Database DB;
-    //DB.resetTables();
-    std::cout << DB.doesFriendshipExists("Alex","Alex") << std::endl;
-    //DB.addGamePlayed("Alex", true);
-    //DB.addGamePlayed("Alex", false);
-    //UserScore alexScore = DB.getScore("Alex");
-    //std::cout<<"Parties jouées : "<< alexScore.GamesPlayed<<", Parties gagnées : "<<alexScore.GamesWon<<std::endl;
-    //std::cout<<DB.getPassword("Alex");
+
+    // efface les ancienne table pour le test
+    DB.resetTables();
+
+    // créé les Comptes
+    DB.createNewAccount("Alex","Alex");
+    DB.createNewAccount("Mark","Mark");
+    DB.createNewAccount("Theo","Theo");
+
+    // connecte l'utilisateur alex
+    DB.connect("Alex");
+    // theo demande en amis alex
+    DB.askFriend("Theo");
+    // alex accepte theo
+    DB.transferFriend("Theo");
+    // mark demande en amis alex
+    DB.askFriend("Mark");
+    // alex accepte mark
+    DB.transferFriend("Mark");
+    // theo est restiré de la liste d'amis :sad:
+    DB.deleteFriendship("Theo");
+
     return 0;
 }
